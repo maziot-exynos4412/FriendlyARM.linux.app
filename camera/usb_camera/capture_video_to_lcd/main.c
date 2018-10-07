@@ -14,32 +14,31 @@
 #include <sys/mman.h>
 #include <dirent.h>
 #include <stdlib.h>
-#include <tslib.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <linux/videodev2.h>
 #include <sys/time.h>
 #include <assert.h> 
 
-// ¶Á³öµÄÊÓÆµ¸ñÊ½
+// è¯»å‡ºçš„è§†é¢‘æ ¼å¼
 static int SpFmt[] = { V4L2_PIX_FMT_YUYV, V4L2_PIX_FMT_MJPEG, V4L2_PIX_FMT_RGB565 };
 static char *ShowFmt[] = { "YUV", "MJPEG", "RGB565" };
  
-/* Í¼Æ¬µÄÏóËØÊı¾İ */
+/* å›¾ç‰‡çš„è±¡ç´ æ•°æ® */
 typedef struct PixelDatas
 {
-        int iWidth;                     /* ¿í¶È: Ò»ĞĞÓĞ¶àÉÙ¸öÏóËØ */
-        int iHeight;                    /* ¸ß¶È: Ò»ÁĞÓĞ¶àÉÙ¸öÏóËØ */
-        int iBpp;                       /* Ò»¸öÏóËØÓÃ¶àÉÙÎ»À´±íÊ¾ */
-        int iLineBytes;                 /* Ò»ĞĞÊı¾İÓĞ¶àÉÙ×Ö½Ú */
-        int iTotalBytes;                /* ËùÓĞ×Ö½ÚÊı */
-        unsigned char *aucPixelDatas;   /* ÏóËØÊı¾İ´æ´¢µÄµØ·½ */
+        int iWidth;                     /* å®½åº¦: ä¸€è¡Œæœ‰å¤šå°‘ä¸ªè±¡ç´  */
+        int iHeight;                    /* é«˜åº¦: ä¸€åˆ—æœ‰å¤šå°‘ä¸ªè±¡ç´  */
+        int iBpp;                       /* ä¸€ä¸ªè±¡ç´ ç”¨å¤šå°‘ä½æ¥è¡¨ç¤º */
+        int iLineBytes;                 /* ä¸€è¡Œæ•°æ®æœ‰å¤šå°‘å­—èŠ‚ */
+        int iTotalBytes;                /* æ‰€æœ‰å­—èŠ‚æ•° */
+        unsigned char *aucPixelDatas;   /* è±¡ç´ æ•°æ®å­˜å‚¨çš„åœ°æ–¹ */
 } T_PixelDatas, *PT_PixelDatas;
 
 //**********************lcd********************//
 static struct fb_var_screeninfo var;
 static struct fb_fix_screeninfo fix;
-static unsigned char *fbmem = NULL; //LCDµÄÓ³ÉäµÄÊ×µØÖ·
+static unsigned char *fbmem = NULL; //LCDçš„æ˜ å°„çš„é¦–åœ°å€
 unsigned int line_width;
 int fb;
 
@@ -48,20 +47,20 @@ struct v4l2_buffer tV4l2Buf;
 static int iFd;
 static int ListNum;
 
-T_PixelDatas ptVideoBufOut;     /*ÏòLCDÊä³öµÄÊı¾İ--×ª»¯ºó*/
-T_PixelDatas ptVideoBufIn;      /*´æ·ÅÉãÏñÍ·ÊäÈëµÄÊı¾İ-×ª»¯Ç°*/
+T_PixelDatas ptVideoBufOut;     /*å‘LCDè¾“å‡ºçš„æ•°æ®--è½¬åŒ–å*/
+T_PixelDatas ptVideoBufIn;      /*å­˜æ”¾æ‘„åƒå¤´è¾“å…¥çš„æ•°æ®-è½¬åŒ–å‰*/
 
-unsigned char* pucVideBuf[4]; // ÊÓÆµBUFF¿Õ¼äµØÖ·
+unsigned char* pucVideBuf[4]; // è§†é¢‘BUFFç©ºé—´åœ°å€
 PT_PixelDatas video_buff;
 
 static unsigned char *hzkmem = NULL;
 struct stat t_stat;
-struct tsdev *TsDev; //ts_openµÄ·µ»ØÖµĞèÒªÓÃµ½
+struct tsdev *TsDev; //ts_opençš„è¿”å›å€¼éœ€è¦ç”¨åˆ°
 unsigned char *bmpmem = NULL;
 
 FILE *filp;
 
-void show_pixel(int x, int y, int color) //»­µãº¯Êı
+void show_pixel(int x, int y, int color) //ç”»ç‚¹å‡½æ•°
 {
         unsigned char *bbp8 = NULL;
         unsigned short *bbp16 = NULL;
@@ -70,7 +69,7 @@ void show_pixel(int x, int y, int color) //»­µãº¯Êı
         r = color >> 16 & 0xff;
         g = color >> 8 & 0xff;
         b = color & 0xff;
-        //¶¨Î»µ½µ±Ç°Î»ÖÃ
+        //å®šä½åˆ°å½“å‰ä½ç½®
         bbp8 = fbmem + var.xres * var.bits_per_pixel / 8 * y + x * var.bits_per_pixel / 8;
         bbp16 = (unsigned short *) bbp8;
         bbp32 = (unsigned int *) bbp8;
@@ -91,35 +90,35 @@ void show_pixel(int x, int y, int color) //»­µãº¯Êı
 
 }
 
-// ³õÊ¼»¯ frambuufer
+// åˆå§‹åŒ– frambuufer
 static int LcdOpen(unsigned char *fbname)
 {
-        /* ´ò¿ªÖ¡»º³åÎÄ¼ş */
+        /* æ‰“å¼€å¸§ç¼“å†²æ–‡ä»¶ */
         fb = open(fbname, 2);
         if (fb < 0)
         {
                 printf("open fbdev is error!!!\n");
                 return -1;
         }
-        ioctl(fb, FBIOGET_VSCREENINFO, &var);           // »ñÈ¡¹Ì¶¨²ÎÊı½á¹¹Ìå·ÅÔÚvar½á¹¹ÌåÖĞ
-        ioctl(fb, FBIOGET_FSCREENINFO, &fix);           // »ñÈ¡¹Ì¶¨²ÎÊı£¬´æ·ÅÔÚfix½á¹¹ÌåÖĞ
+        ioctl(fb, FBIOGET_VSCREENINFO, &var);           // è·å–å›ºå®šå‚æ•°ç»“æ„ä½“æ”¾åœ¨varç»“æ„ä½“ä¸­
+        ioctl(fb, FBIOGET_FSCREENINFO, &fix);           // è·å–å›ºå®šå‚æ•°ï¼Œå­˜æ”¾åœ¨fixç»“æ„ä½“ä¸­
 
-        // ÏÔÊ¾Ò»ĞĞĞèÒªµÄ×Ö½ÚÊıÁ¿=800*32/ 8
+        // æ˜¾ç¤ºä¸€è¡Œéœ€è¦çš„å­—èŠ‚æ•°é‡=800*32/ 8
         line_width = var.xres * var.bits_per_pixel / 8;
 
-        /* ½«LCDÆÁµÄµØÖ·Ó³Éäµ½DDRÄÚ´æ¿Õ¼ä ·µ»ØÖµLCDÆÁµÄÊ×µØÖ· */
-        fbmem = (unsigned char *) mmap(NULL, fix.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb, 0);           //Ó³ÉäÄÚ´æ
-        if (fbmem == (unsigned char *) -1)              //Ó³ÉäÊ§°Ü
+        /* å°†LCDå±çš„åœ°å€æ˜ å°„åˆ°DDRå†…å­˜ç©ºé—´ è¿”å›å€¼LCDå±çš„é¦–åœ°å€ */
+        fbmem = (unsigned char *) mmap(NULL, fix.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb, 0);  //æ˜ å°„å†…å­˜
+        if (fbmem == (unsigned char *) -1)              //æ˜ å°„å¤±è´¥
         {
                 printf("fbmmap is error!!!\n");
                 munmap(fbmem, fix.smem_len);
                 return -1;
         }
-        memset(fbmem, 0x00, fix.smem_len);              // ÇåÆÁº¯ÊıÍùÓ³ÉäµÄµØÖ·Ìî³ä fix.sem_len ´óĞ¡ºÚÉ«ÑÕÉ«½øÈ¥
+        memset(fbmem, 0x00, fix.smem_len);              // æ¸…å±å‡½æ•°å¾€æ˜ å°„çš„åœ°å€å¡«å…… fix.sem_len å¤§å°é»‘è‰²é¢œè‰²è¿›å»
         return 0;
 }
 
-//ÏÔÊ¾Ò»ĞĞÊı¾İ
+// æ˜¾ç¤ºä¸€è¡Œæ•°æ®
 void show_line(unsigned char *src, unsigned char* dst, unsigned int width)
 {
         unsigned char r, g, b;
@@ -143,7 +142,7 @@ void freebmpaddr(unsigned char *bmpmem)
         fclose(filp);
 }
 
-//ÅĞ¶Ï¶Á³öµÄÍ¼Æ¬Êı¾İ¸ñÊ½
+// åˆ¤æ–­è¯»å‡ºçš„å›¾ç‰‡æ•°æ®æ ¼å¼
 int isSpFmt(int FmtPix)
 {
         int i = 0;
@@ -158,13 +157,13 @@ int isSpFmt(int FmtPix)
         return -1;
 }
 
-//YUV×ªRGBÊµÏÖ
+//YUVè½¬RGBå®ç°
 static unsigned int Pyuv422torgb32(unsigned char x, unsigned y, unsigned char * input_ptr, unsigned char * output_ptr, unsigned int image_width,
                 unsigned int image_height)
 {
         unsigned int i, size, j;
         unsigned char Y, Y1, U, V;
-        unsigned char *buff = input_ptr; //±£´æµØÖ·-Ô´Êı¾İ
+        unsigned char *buff = input_ptr; //ä¿å­˜åœ°å€-æºæ•°æ®
         unsigned char * output_pt = output_ptr;
         unsigned char *src = NULL;
         unsigned char * dst = NULL;
@@ -194,10 +193,10 @@ static unsigned int Pyuv422torgb32(unsigned char x, unsigned y, unsigned char * 
                 *output_pt++ = r;
         }
 
-        //ÔÚLCDÆÁÏÔÊ¾²É¼¯µÄÊı¾İÍ¼ÏñÆğÊ¼µØÖ·
-        src = output_ptr; //RGBÊı¾İ
+        //åœ¨LCDå±æ˜¾ç¤ºé‡‡é›†çš„æ•°æ®å›¾åƒèµ·å§‹åœ°å€
+        src = output_ptr; //RGBæ•°æ®
 
-        //¼ÆËãÏÔÊ¾µÄÆğÊ¼µØÖ·
+        //è®¡ç®—æ˜¾ç¤ºçš„èµ·å§‹åœ°å€
         dst = fbmem + var.xres * var.bits_per_pixel / 8 * y + x * var.bits_per_pixel / 8;
 
         for (j = 0; j < image_height; j++)
@@ -210,48 +209,48 @@ static unsigned int Pyuv422torgb32(unsigned char x, unsigned y, unsigned char * 
 
 }
 
-/* ²Î¿¼luvcview */
+/* å‚è€ƒluvcview */
 
-//YUV×ªRGB
+//YUVè½¬RGB
 static int Yuv2RgbConvert(unsigned char x, unsigned char y, PT_PixelDatas ptVideoBufIn, PT_PixelDatas ptVideoBufOut)
 {
-        //ÉùÃ÷Á½¸öÖ¸Õë
+        //å£°æ˜ä¸¤ä¸ªæŒ‡é’ˆ
         PT_PixelDatas ptPixelDatasIn = ptVideoBufIn;
         PT_PixelDatas ptPixelDatasOut = ptVideoBufOut;
 
-        /*½øĞĞÁË¸³Öµ²Ù×÷*/
+        /*è¿›è¡Œäº†èµ‹å€¼æ“ä½œ*/
         video_buff = ptVideoBufIn;
         ptPixelDatasOut->iWidth = ptPixelDatasIn->iWidth;
         ptPixelDatasOut->iHeight = ptPixelDatasIn->iHeight;
 
-        ptPixelDatasOut->iBpp = 32; /*ÏñËØÎ»Êı*/
-        //Ò»ĞĞµÄ×Ö½ÚÊı
+        ptPixelDatasOut->iBpp = 32; /*åƒç´ ä½æ•°*/
+        //ä¸€è¡Œçš„å­—èŠ‚æ•°
         ptPixelDatasOut->iLineBytes = ptPixelDatasOut->iWidth * ptPixelDatasOut->iBpp / 8;
-        //×Ü¹²µÄ×Ö½ÚÊı
+        //æ€»å…±çš„å­—èŠ‚æ•°
         ptPixelDatasOut->iTotalBytes = ptPixelDatasOut->iLineBytes * ptPixelDatasOut->iHeight;
 
-        //ÉêÇëÒ»Ö¡Êı¾İµÄ¿Õ¼ä
-        if (!ptPixelDatasOut->aucPixelDatas) //ÅĞ¶Ï´æ·ÅÏñËØµØÖ·ÊÇ·ñÎª¿Õ 
+        //ç”³è¯·ä¸€å¸§æ•°æ®çš„ç©ºé—´
+        if (!ptPixelDatasOut->aucPixelDatas) //åˆ¤æ–­å­˜æ”¾åƒç´ åœ°å€æ˜¯å¦ä¸ºç©º 
         {
-                ptPixelDatasOut->aucPixelDatas = malloc(ptPixelDatasOut->iTotalBytes); //ÉêÇë¿Õ¼ä
+                ptPixelDatasOut->aucPixelDatas = malloc(ptPixelDatasOut->iTotalBytes); //ç”³è¯·ç©ºé—´
         }
 
-        //YUV422×ªRGB
+        //YUV422è½¬RGB
         Pyuv422torgb32(x, y, ptPixelDatasIn->aucPixelDatas, ptPixelDatasOut->aucPixelDatas, ptPixelDatasOut->iWidth, ptPixelDatasOut->iHeight);
         return 0;
 }
 
-//ÉãÏñÍ·Éè±¸µÄ³õÊ¼»¯
+//æ‘„åƒå¤´è®¾å¤‡çš„åˆå§‹åŒ–
 static int camera_init(void)
 {
         int i = 0;
         int cnt = 0;
         int error;
 
-        //¶¨ÒåÉãÏñÍ·Çı¶¯µÄBUFµÄ¹¦ÄÜ²¶»ñÊÓÆµ
+        //å®šä¹‰æ‘„åƒå¤´é©±åŠ¨çš„BUFçš„åŠŸèƒ½æ•è·è§†é¢‘
         int iType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-        /* 1¡¢´ò¿ªÊÓÆµÉè±¸ */
+        /* 1ã€æ‰“å¼€è§†é¢‘è®¾å¤‡ */
         iFd = open("/dev/video15", O_RDWR);
         if (iFd < 0)
         {
@@ -259,8 +258,8 @@ static int camera_init(void)
                 return 0;
         }
 
-        struct v4l2_capability tV4L2Cap; //»ñÈ¡ÉãÏñÍ·¹¦ÄÜ
-        /* 2¡¢VIDIOC_QUERYCAP È·¶¨ËüÊÇ·ñÊÓÆµ²¶×½Éè±¸,Ö§³ÖÄÄÖÖ½Ó¿Ú(streaming/read,write) */
+        struct v4l2_capability tV4L2Cap; // 
+        /* 2ã€VIDIOC_QUERYCAP ç¡®å®šå®ƒæ˜¯å¦è§†é¢‘æ•æ‰è®¾å¤‡,æ”¯æŒå“ªç§æ¥å£(streaming/read,write) */
         error = ioctl(iFd, VIDIOC_QUERYCAP, &tV4L2Cap);
         if (error)
         {
@@ -268,37 +267,37 @@ static int camera_init(void)
                 return -1;
         }
 
-        /* 2.1¡¢¼ì²âÊÇ·ñÊÓÆµCAPTUREÉè±¸ */
+        /* 2.1ã€æ£€æµ‹æ˜¯å¦è§†é¢‘CAPTUREè®¾å¤‡ */
         if (!(tV4L2Cap.capabilities & V4L2_CAP_VIDEO_CAPTURE))
         {
                 printf("not a video capture device\n");
                 return -1;
         }
 
-        /* 2.2¡¢Ö§³ÖÄÄÖÖ½Ó¿Ú:mmap read/write */
+        /* 2.2ã€æ”¯æŒå“ªç§æ¥å£:mmap read/write */
         if (tV4L2Cap.capabilities & V4L2_CAP_STREAMING)
         {
                 printf("supports streaming i/o\n");
         }
 
-        //ÅĞ¶ÏÊÇ·ñÖ§³ÖÆÕÍ¨µÄ¶ÁĞ´IO
+        // åˆ¤æ–­æ˜¯å¦æ”¯æŒæ™®é€šçš„è¯»å†™IO
         if (tV4L2Cap.capabilities & V4L2_CAP_READWRITE)
         {
                 printf("supports read i/o\n");
         }
 
-        struct v4l2_fmtdesc tV4L2FmtDesc; //±£´æÉãÏñÍ·Ö§³ÖµÄ¸ñÊ½
+        struct v4l2_fmtdesc tV4L2FmtDesc; //ä¿å­˜æ‘„åƒå¤´æ”¯æŒçš„æ ¼å¼
         
-        /* 3¡¢VIDIOC_ENUM_FMT ²éÑ¯Ö§³ÖÄÄÖÖ¸ñÊ½---Ã¶¾Ù³öÉãÏñÍ·Ö§³ÖµÄËùÓĞ¸ñÊ½ */
+        /* 3ã€VIDIOC_ENUM_FMT æŸ¥è¯¢æ”¯æŒå“ªç§æ ¼å¼---æšä¸¾å‡ºæ‘„åƒå¤´æ”¯æŒçš„æ‰€æœ‰æ ¼å¼ */
         memset(&tV4L2FmtDesc, 0, sizeof(tV4L2FmtDesc));
-        tV4L2FmtDesc.index = 0; //Ë÷Òı±àºÅ£¬Êı×éÏÂ±ê
-        tV4L2FmtDesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; //Ö§³ÖÊÓÆµ²¶»ñ
+        tV4L2FmtDesc.index = 0; //ç´¢å¼•ç¼–å·ï¼Œæ•°ç»„ä¸‹æ ‡
+        tV4L2FmtDesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; //æ”¯æŒè§†é¢‘æ•è·
 
-        //¶Á³ö¸ÃÉè±¸Ö§³ÖµÄÍ¼Ïñ¸ñÊ½
+        //è¯»å‡ºè¯¥è®¾å¤‡æ”¯æŒçš„å›¾åƒæ ¼å¼
         while ((error = ioctl(iFd, VIDIOC_ENUM_FMT, &tV4L2FmtDesc)) == 0)
         {
                 printf("ok %d\n", ++cnt);
-                //ÅĞ¶Ï¶Á³öµÄÍ¼Æ¬Êı¾İ¸ñÊ½
+                //åˆ¤æ–­è¯»å‡ºçš„å›¾ç‰‡æ•°æ®æ ¼å¼
                 if (!isSpFmt(tV4L2FmtDesc.pixelformat))
                 {
                         printf("Support :%d\n", tV4L2FmtDesc.pixelformat);
@@ -307,22 +306,22 @@ static int camera_init(void)
         }
 
         struct v4l2_format tV4l2Fmt;
-        /* 4¡¢ VIDIOC_S_FMT ÉèÖÃÉãÏñÍ·Ê¹ÓÃÄÄÖÖ¸ñÊ½ */
+        /* 4ã€ VIDIOC_S_FMT è®¾ç½®æ‘„åƒå¤´ä½¿ç”¨å“ªç§æ ¼å¼ */
         memset(&tV4l2Fmt, 0, sizeof(struct v4l2_format));
-        tV4l2Fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; //ÊÓÆµ²¶»ñ
+        tV4l2Fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; //è§†é¢‘æ•è·
 
-        //ÉèÖÃÉãÏñÍ·Êä³öµÄÍ¼Ïñ¸ñÊ½
+        //è®¾ç½®æ‘„åƒå¤´è¾“å‡ºçš„å›¾åƒæ ¼å¼
         tV4l2Fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 
-        /*ĞŞ¸ÄÏÔÊ¾µÄ³ß´ç---ÔÚLCDÉÏÏÔÊ¾µÄÎ»ÖÃ*/
+        /*ä¿®æ”¹æ˜¾ç¤ºçš„å°ºå¯¸---åœ¨LCDä¸Šæ˜¾ç¤ºçš„ä½ç½®*/
         tV4l2Fmt.fmt.pix.width = 640;
         tV4l2Fmt.fmt.pix.height = 480;
         tV4l2Fmt.fmt.pix.field = V4L2_FIELD_ANY;
 
-        /* Èç¹ûÇı¶¯³ÌĞò·¢ÏÖÎŞ·¨Ä³Ğ©²ÎÊı(±ÈÈç·Ö±æÂÊ),
-         * Ëü»áµ÷ÕûÕâĞ©²ÎÊı, ²¢ÇÒ·µ»Ø¸øÓ¦ÓÃ³ÌĞò
+        /* å¦‚æœé©±åŠ¨ç¨‹åºå‘ç°æ— æ³•æŸäº›å‚æ•°(æ¯”å¦‚åˆ†è¾¨ç‡),
+         * å®ƒä¼šè°ƒæ•´è¿™äº›å‚æ•°, å¹¶ä¸”è¿”å›ç»™åº”ç”¨ç¨‹åº
          */
-        //VIDIOC_S_FMT ÉèÖÃÉãÏñÍ·µÄÊä³ö²ÎÊı
+        //VIDIOC_S_FMT è®¾ç½®æ‘„åƒå¤´çš„è¾“å‡ºå‚æ•°
         error = ioctl(iFd, VIDIOC_S_FMT, &tV4l2Fmt);
         if (error)
         {
@@ -330,37 +329,37 @@ static int camera_init(void)
                 return -1;
         }
 
-        //´òÓ¡ÉãÏñÍ·Êµ¼ÊµÄÊä³ö²ÎÊı
+        //æ‰“å°æ‘„åƒå¤´å®é™…çš„è¾“å‡ºå‚æ•°
         printf("Support Format:%d\n", tV4l2Fmt.fmt.pix.pixelformat);
         printf("Support width:%d\n", tV4l2Fmt.fmt.pix.width);
         printf("Support height:%d\n", tV4l2Fmt.fmt.pix.height);
 
-        /* ³õÊ¼»¯ptVideoBufIn½á¹¹Ìå£¬Îª×ª»¯×ö×¼±¸ */
+        /* åˆå§‹åŒ–ptVideoBufInç»“æ„ä½“ï¼Œä¸ºè½¬åŒ–åšå‡†å¤‡ */
         ptVideoBufIn.iBpp = (tV4l2Fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) ? 24 : (tV4l2Fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) ? 0 :
                             (tV4l2Fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB565) ? 16 : 0;
-        //¸ß¶È ºÍ¿í¶ÈµÄ¸³Öµ
+        //é«˜åº¦ å’Œå®½åº¦çš„èµ‹å€¼
         ptVideoBufIn.iHeight = tV4l2Fmt.fmt.pix.height;
         ptVideoBufIn.iWidth = tV4l2Fmt.fmt.pix.width;
 
-        //Ò»ĞĞËùĞèÒªµÄ×Ö½ÚÊı
+        //ä¸€è¡Œæ‰€éœ€è¦çš„å­—èŠ‚æ•°
         ptVideoBufIn.iLineBytes = ptVideoBufIn.iWidth * ptVideoBufIn.iBpp / 8;
-        //Ò»Ö¡Í¼ÏñµÄ×Ö½ÚÊı
+        //ä¸€å¸§å›¾åƒçš„å­—èŠ‚æ•°
         ptVideoBufIn.iTotalBytes = ptVideoBufIn.iLineBytes * ptVideoBufIn.iHeight;
         printf("ptVideoBufIn.iBpp = %d\n", ptVideoBufIn.iBpp);
 
-        //v412ÇëÇóÃüÁî
+        //v412è¯·æ±‚å‘½ä»¤
         struct v4l2_requestbuffers tV4l2ReqBuffs;
 
-        /* 5¡¢VIDIOC_REQBUFS  ÉêÇëbuffer */
+        /* 5ã€VIDIOC_REQBUFS  ç”³è¯·buffer */
         memset(&tV4l2ReqBuffs, 0, sizeof(struct v4l2_requestbuffers));
 
-        /* ·ÖÅä4¸öbuffer:Êµ¼ÊÉÏÓÉVIDIOC_REQBUFS »ñÈ¡µ½µÄĞÅÏ¢À´¾ö¶¨ */
+        /* åˆ†é…4ä¸ªbuffer:å®é™…ä¸Šç”±VIDIOC_REQBUFS è·å–åˆ°çš„ä¿¡æ¯æ¥å†³å®š */
         tV4l2ReqBuffs.count = 4;
-        /*Ö§³ÖÊÓÆµ²¶»ñ¹¦ÄÜ*/
+        /*æ”¯æŒè§†é¢‘æ•è·åŠŸèƒ½*/
         tV4l2ReqBuffs.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        /* ±íÊ¾ÉêÇëµÄ»º³åÊÇÖ§³ÖMMAP */
+        /* è¡¨ç¤ºç”³è¯·çš„ç¼“å†²æ˜¯æ”¯æŒMMAP */
         tV4l2ReqBuffs.memory = V4L2_MEMORY_MMAP;
-        /* Îª·ÖÅäbuffer×ö×¼±¸ */
+        /* ä¸ºåˆ†é…bufferåšå‡†å¤‡ */
         error = ioctl(iFd, VIDIOC_REQBUFS, &tV4l2ReqBuffs);
         if (error)
         {
@@ -368,7 +367,7 @@ static int camera_init(void)
                 return -1;
         }
 
-        /* ÅĞ¶ÏÊÇ·ñÖ§³Ömmap */
+        /* åˆ¤æ–­æ˜¯å¦æ”¯æŒmmap */
         if (tV4L2Cap.capabilities & V4L2_CAP_STREAMING)
         {
                 /* map the buffers */
@@ -379,7 +378,7 @@ static int camera_init(void)
                         tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                         tV4l2Buf.memory = V4L2_MEMORY_MMAP;
 
-                        /* 6¡¢VIDIOC_QUERYBUF È·¶¨Ã¿Ò»¸öbufferµÄĞÅÏ¢ ²¢ÇÒ mmap */
+                        /* 6ã€VIDIOC_QUERYBUF ç¡®å®šæ¯ä¸€ä¸ªbufferçš„ä¿¡æ¯ å¹¶ä¸” mmap */
                         error = ioctl(iFd, VIDIOC_QUERYBUF, &tV4l2Buf);
                         if (error)
                         {
@@ -387,10 +386,10 @@ static int camera_init(void)
                                 return -1;
                         }
 
-                        //´òÓ¡µÄË÷Òı
+                        //æ‰“å°çš„ç´¢å¼•
                         printf("length = %d\n", tV4l2Buf.length);
 
-                        //Ó³Éä¿Õ¼äµØÖ·
+                        //æ˜ å°„ç©ºé—´åœ°å€
                         pucVideBuf[i] = mmap(0 /* start anywhere */, tV4l2Buf.length, PROT_READ, MAP_SHARED, iFd, tV4l2Buf.m.offset);
                         if (pucVideBuf[i] == MAP_FAILED)
                         {
@@ -401,7 +400,7 @@ static int camera_init(void)
                 }
         }
 
-        /* 7¡¢VIDIOC_QBUF  ·ÅÈë¶ÓÁĞ 4*/
+        /* 7ã€VIDIOC_QBUF  æ”¾å…¥é˜Ÿåˆ— 4*/
         for (i = 0; i < tV4l2ReqBuffs.count; i++)
         {
                 memset(&tV4l2Buf, 0, sizeof(struct v4l2_buffer));
@@ -409,7 +408,7 @@ static int camera_init(void)
                 tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                 tV4l2Buf.memory = V4L2_MEMORY_MMAP;
 
-                //½«BUF·ÅÈë¶ÓÁĞ-  queue
+                //å°†BUFæ”¾å…¥é˜Ÿåˆ—-  queue
                 error = ioctl(iFd, VIDIOC_QBUF, &tV4l2Buf);
                 if (error)
                 {
@@ -419,8 +418,8 @@ static int camera_init(void)
         }
         printf("ready to read data\n");
 
-        /* 8¡¢Æô¶¯ÉãÏñÍ·¿ªÊ¼¶ÁÊı¾İ
-         VIDIOC_STREAMON :Æô¶¯
+        /* 8ã€å¯åŠ¨æ‘„åƒå¤´å¼€å§‹è¯»æ•°æ®
+         VIDIOC_STREAMON :å¯åŠ¨
          */
         error = ioctl(iFd, VIDIOC_STREAMON, &iType);
         if (error)
@@ -431,7 +430,7 @@ static int camera_init(void)
         return 0;
 }
 
-/*¶ÁÈ¡ÏÔÊ¾ÊÓÆµµÄÏß³Ì*/
+/*è¯»å–æ˜¾ç¤ºè§†é¢‘çš„çº¿ç¨‹*/
 void *camera_pthread(void * arg)
 {
         int error;
@@ -441,32 +440,32 @@ void *camera_pthread(void * arg)
 
         struct pollfd fds[1];
 
-        /* 8.1¡¢Ê¹ÓÃpollÀ´µÈ´ıÊÇ·ñÓĞÊı¾İ */
+        /* 8.1ã€ä½¿ç”¨pollæ¥ç­‰å¾…æ˜¯å¦æœ‰æ•°æ® */
         fds[0].fd = iFd;
         fds[0].events = POLLIN;
 
-        /* YUV¸ñÊ½µÄÊı¾İ<------>ÔÚLCDÉÏÏÔÊ¾:rgb888 */
+        /* YUVæ ¼å¼çš„æ•°æ®<------>åœ¨LCDä¸Šæ˜¾ç¤º:rgb888 */
         initLut();
-        ptVideoBufOut.aucPixelDatas = NULL; /*³õÊ¼µØÖ·Ö¸Ïò¿Õ*/
+        ptVideoBufOut.aucPixelDatas = NULL; /*åˆå§‹åœ°å€æŒ‡å‘ç©º*/
 
         while (1)
         {
                 //printf("wait data....-->\n");
                 error = poll(fds, 1, -1);
                 memset(&tV4l2Buf, 0, sizeof(struct v4l2_buffer));
-                tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;    //ÀàĞÍ
-                tV4l2Buf.memory = V4L2_MEMORY_MMAP;             //´æ´¢¿Õ¼äÀàĞÍ
+                tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;    //ç±»å‹
+                tV4l2Buf.memory = V4L2_MEMORY_MMAP;             //å­˜å‚¨ç©ºé—´ç±»å‹
 
-                /* 9¡¢VIDIOC_DQBUF    ´Ó¶ÓÁĞÖĞÈ¡³ö */
+                /* 9ã€VIDIOC_DQBUF    ä»é˜Ÿåˆ—ä¸­å–å‡º */
                 //printf("wait ioctl data....-->\n");
-                error = ioctl(iFd, VIDIOC_DQBUF, &tV4l2Buf);    //È¡³öÒ»Ö¡Êı¾İ
-                ListNum = tV4l2Buf.index;                       //Ë÷Òı±àºÅ
-                //printf("listnum1:%d\n",ListNum); //´òÓ¡Ë÷Òı±àºÅ
+                error = ioctl(iFd, VIDIOC_DQBUF, &tV4l2Buf);    //å–å‡ºä¸€å¸§æ•°æ®
+                ListNum = tV4l2Buf.index;                       //ç´¢å¼•ç¼–å·
+                //printf("listnum1:%d\n",ListNum); //æ‰“å°ç´¢å¼•ç¼–å·
 
-                /*µØÖ·¸³Öµ pucVideBuf[ListNum]: ´æ·ÅÉãÏñÍ·Êä³öµÄÊı¾İ */
+                /*åœ°å€èµ‹å€¼ pucVideBuf[ListNum]: å­˜æ”¾æ‘„åƒå¤´è¾“å‡ºçš„æ•°æ® */
                 ptVideoBufIn.aucPixelDatas = pucVideBuf[ListNum];
 
-                //ÔÚLCDÆÁÉÏÏÔÊ¾×ª»¯µÄÊı¾İ
+                //åœ¨LCDå±ä¸Šæ˜¾ç¤ºè½¬åŒ–çš„æ•°æ®
                 Yuv2RgbConvert(0, 0, &ptVideoBufIn, &ptVideoBufOut);
 
                 memset(&tV4l2Buf, 0, sizeof(struct v4l2_buffer));
@@ -474,24 +473,24 @@ void *camera_pthread(void * arg)
                 tV4l2Buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                 tV4l2Buf.memory = V4L2_MEMORY_MMAP;
                 error = ioctl(iFd, VIDIOC_QBUF, &tV4l2Buf);
-                //printf("listnum2:%d\n",tV4l2Buf.index); //´òÓ¡Ë÷Òı±àºÅ
+                //printf("listnum2:%d\n",tV4l2Buf.index); //æ‰“å°ç´¢å¼•ç¼–å·
                 //Yuv2RgbConvert(0,0,&ptVideoBufIn,&ptVideoBufOut);
 
         }
 }
 
-// µ÷ÓÃ¸ñÊ½ ./a.out /dev/fb0
+// è°ƒç”¨æ ¼å¼ ./app
 int main(int argc, char *argv[])
 {
-        pthread_t camerathread;                 // ´æ·ÅÏß³ÌµÄ ID
-        LcdOpen("/dev/fb0");                    // ´ò¿ª lcd
-        if (camera_init())                      // ´ò¿ªÉãÏñÍ·Éè±¸
+        pthread_t camerathread;                 // å­˜æ”¾çº¿ç¨‹çš„ ID
+        LcdOpen("/dev/fb0");                    // æ‰“å¼€ lcd
+        if (camera_init())                      // æ‰“å¼€æ‘„åƒå¤´è®¾å¤‡
         {
                 close(iFd);
                 printf("camera init fail\n");
         }
 
-        pthread_create(&camerathread, NULL, camera_pthread, NULL); //ÉãÏñÍ·Ïß³Ì
+        pthread_create(&camerathread, NULL, camera_pthread, NULL); //æ‘„åƒå¤´çº¿ç¨‹
 
         while (1)
         {
